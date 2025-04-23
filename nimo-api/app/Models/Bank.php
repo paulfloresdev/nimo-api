@@ -4,11 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AccountType extends Model
+class Bank extends Model
 {
-    protected $fillable = [
-        'type'
-    ];
+    protected $fillable = ['name', 'img_path', 'type'];
 
     protected $hidden = ['created_at', 'updated_at'];
 

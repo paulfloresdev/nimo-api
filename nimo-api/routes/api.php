@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AccountTypesController;
 use App\Http\Controllers\NetworkController;
+use App\Http\Controllers\BankController;
+use App\Http\Controllers\CardController;
 
 // AUTH
 Route::post('/auth/signup', [AuthController::class, 'register']);
@@ -21,7 +23,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // ACCOUNT TYPES
     Route::apiResource('account-types', AccountTypesController::class);
 
-    // NETWORK
+    // NETWORKS
     Route::apiResource('networks', NetworkController::class);
-    Route::post('/networks-update/{id}', [NetworkController::class, 'update']);
+    Route::post('/networks/{id}/update', [NetworkController::class, 'update']);
+
+    // BANKS
+    Route::apiResource('banks', BankController::class);
+    Route::post('/banks/{id}/update', [BankController::class, 'update']);
+
+    // CARD
+    Route::apiResource('cards', CardController::class);
 });

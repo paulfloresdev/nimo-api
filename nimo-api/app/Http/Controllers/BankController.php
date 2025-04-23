@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Network;
 use Illuminate\Http\Request;
+use App\Models\Bank;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-class NetworkController extends Controller
+class BankController extends Controller
 {
+    /**
+     * Display a listing of the resource.
+     */
     public function index()
     {
-        $network = Network::all();
+        $bank = Bank::all();
 
-        if ($network->isEmpty()) {
+        if ($bank->isEmpty()) {
             return response()->json([
                 'message' => 'No se encontraron los recursos solicitados.',
             ], 404);
@@ -21,36 +24,44 @@ class NetworkController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $network
+            'data' => $bank
         ], 200);
     }
 
+    /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:64',
+            'name' => 'required|string|max:128',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'type' => 'required|in:BANK,SOFIPO',
         ]);
 
-        $imagePath = $request->file('image')->store('networks', 'public');
+        $imagePath = $request->file('image')->store('banks', 'public');
         $imageUrl = Storage::url($imagePath);
 
-        $network = Network::create([
+        $bank = Bank::create([
             'name' => $request->name,
             'img_path' => $imageUrl,
+            'type' => $request->type,
         ]);
 
         return response()->json([
             'message' => 'Recurso almacenado exitosamente.',
-            'data' => $network
+            'data' => $bank
         ], 201);
     }
 
+    /**
+     * Display the specified resource.
+     */
     public function show(string $id)
     {
-        $network = Network::find($id);
+        $bank = Bank::find($id);
 
-        if ($network == null) {
+        if ($bank == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso solicitado.',
             ], 404);
@@ -58,37 +69,45 @@ class NetworkController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $network
+            'data' => $bank
         ], 200);
     }
 
+    /**
+     * Update the specified resource in storage.
+     */
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:64',
+            'name' => 'sometimes|string|max:128',
             'image' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'type' => 'required|in:BANK,SOFIPO',
         ]);
 
-        $network = Network::findOrFail($id);
+        $bank = Bank::findOrFail($id);
 
         if ($request->hasFile('image')) {
             // Eliminación SEGURA de la imagen anterior
-            $this->deleteImageFile($network->img_path);
+            $this->deleteImageFile($bank->img_path);
 
             // Guardar nueva imagen
-            $path = $request->file('image')->store('networks', 'public');
-            $network->img_path = Storage::url($path);
+            $path = $request->file('image')->store('banks', 'public');
+            $bank->img_path = Storage::url($path);
         }
 
         if ($request->has('name')) {
-            $network->name = $validated['name'];
+            $bank->name = $validated['name'];
         }
 
-        $network->save();
+        if ($request->has('type')) {
+            $bank->type = $validated['type'];
+        }
+
+        $bank->save();
 
         return response()->json([
             'message' => 'Actualización exitosa',
-            'data' => $network
+            'data' => $bank
         ], 200);
     }
 
@@ -123,14 +142,14 @@ class NetworkController extends Controller
         }
     }
 
-    public function destroy(Network $network)
+    public function destroy(Bank $bank)
     {
-        if ($network->img_path) {
-            $imagePath = str_replace('/storage', 'public', $network->img_path);
+        if ($bank->img_path) {
+            $imagePath = str_replace('/storage', 'public', $bank->img_path);
             Storage::delete($imagePath);
         }
 
-        $network->delete();
+        $bank->delete();
 
         return response()->json([
             'message' => 'Recurso eliminado exitosamente.'
