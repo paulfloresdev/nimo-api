@@ -87,7 +87,7 @@ class NetworkController extends Controller
         $network->save();
 
         return response()->json([
-            'message' => 'Actualización exitosa',
+            'message' => 'Recurso actualizado exitosamente.',
             'data' => $network
         ], 200);
     }

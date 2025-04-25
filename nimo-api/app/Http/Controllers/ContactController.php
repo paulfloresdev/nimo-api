@@ -3,18 +3,18 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Card;
+use App\Models\Contact;
 
-class CardController extends Controller
+class ContactController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        $cards = Card::all();
+        $contacts = Contact::all();
 
-        if ($cards->isEmpty()) {
+        if ($contacts->isEmpty()) {
             return response()->json([
                 'message' => 'No se encontraron los recursos solicitados.',
             ], 404);
@@ -22,7 +22,7 @@ class CardController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $cards
+            'data' => $contacts
         ], 200);
     }
 
@@ -32,26 +32,18 @@ class CardController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'numbers' => 'required|string|size:4',
-            'color' => 'required|string|size:7',
-            'type_id' => 'required|integer|exists:account_types,id',
-            'bank_id' => 'required|integer|exists:banks,id',
-            'network_id' => 'required|integer|exists:networks,id',
-            'user_id' => 'required|integer|exists:users,id',
+            'alias' => 'required|max:32',
+            'user_id' => 'required|integer|exists:users,id'
         ]);
 
-        $card = Card::create([
-            'numbers' => $request->numbers,
-            'color' => $request->color,
-            'type_id' => $request->type_id,
-            'bank_id' => $request->bank_id,
-            'network_id' => $request->network_id,
-            'user_id' => $request->user_id,
+        $contact = Contact::create([
+            'alias' => $request->alias,
+            'user_id' => $request->user_id
         ]);
 
         return response()->json([
             'message' => 'Recurso almacenado exitosamente.',
-            'data' => $card
+            'data' => $contact
         ], 201);
     }
 
@@ -60,9 +52,9 @@ class CardController extends Controller
      */
     public function show(string $id)
     {
-        $card = Card::find($id);
+        $contact = Contact::find($id);
 
-        if ($card == null) {
+        if ($contact == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso solicitado.',
             ], 404);
@@ -70,7 +62,7 @@ class CardController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $card
+            'data' => $contact
         ], 200);
     }
 
@@ -80,34 +72,26 @@ class CardController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'numbers' => 'sometimes|string|size:4',
-            'color' => 'sometimes|string|size:7',
-            'type_id' => 'sometimes|integer|exists:account_types,id',
-            'bank_id' => 'sometimes|integer|exists:banks,id',
-            'network_id' => 'sometimes|integer|exists:networks,id',
-            'user_id' => 'sometimes|integer|exists:users,id',
+            'alias' => 'required|max:32',
+            'user_id' => 'required|integer|exists:users,id'
         ]);
 
-        $card = Card::findOrFail($id);
+        $contact = Contact::findOrFail($id);
 
-        if ($card == null) {
+        if ($contact == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso que busca actualizar.',
             ], 404);
         }
 
-        $card->update([
-            'numbers' => $request->numbers,
-            'color' => $request->color,
-            'type_id' => $request->type_id,
-            'bank_id' => $request->bank_id,
-            'network_id' => $request->network_id,
-            'user_id' => $request->user_id,
+        $contact->update([
+            'alias' => $request->alias,
+            'user_id' => $request->user_id
         ]);
 
         return response()->json([
             'message' => 'Recurso actualizado exitosamente.',
-            'data' => $card
+            'data' => $contact
         ], 200);
     }
 
@@ -116,15 +100,15 @@ class CardController extends Controller
      */
     public function destroy(string $id)
     {
-        $card = Card::findOrFail($id);
+        $contact = Contact::findOrFail($id);
 
-        if ($card == null) {
+        if ($contact == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso que busca eliminar.',
             ], 404);
         }
 
-        $card->delete();
+        $contact->delete();
 
         return response()->json([
             'message' => 'Recurso eliminado exitosamente.'

@@ -32,7 +32,7 @@ class AccountTypesController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'type' => 'required|min:1|max:24',
+            'type' => 'required|in:DEBIT,CREDIT',
         ]);
 
         $accountType = AccountType::create([
@@ -70,7 +70,7 @@ class AccountTypesController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'type' => 'required|min:1|max:24',
+            'type' => 'required|in:DEBIT,CREDIT',
         ]);
 
         $accountType = AccountType::findOrFail($id);

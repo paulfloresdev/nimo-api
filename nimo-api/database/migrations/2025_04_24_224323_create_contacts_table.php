@@ -11,9 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('account_types', function (Blueprint $table) {
+        Schema::create('contacts', function (Blueprint $table) {
             $table->id();
-            $table->enum('type',['DEBIT', 'CREDIT'])->unique();
+            $table->string('alias');
+            $table->foreignId('user_id')->unsigned()->constrained('users')->onUpdate('cascade')->onDelete('restrict');
             $table->timestamps();
         });
     }
@@ -23,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('account_types');
+        Schema::dropIfExists('contacts');
     }
 };

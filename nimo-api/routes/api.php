@@ -7,6 +7,8 @@ use App\Http\Controllers\AccountTypesController;
 use App\Http\Controllers\NetworkController;
 use App\Http\Controllers\BankController;
 use App\Http\Controllers\CardController;
+use App\Http\Controllers\TransactionTypeController;
+use App\Http\Controllers\ContactController;
 
 // AUTH
 Route::post('/auth/signup', [AuthController::class, 'register']);
@@ -33,4 +35,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // CARD
     Route::apiResource('cards', CardController::class);
+
+    // TRANSACTION TYPES
+    Route::apiResource('transaction-types', TransactionTypeController::class);
+
+    // CONTACT
+    Route::apiResource('contacts', ContactController::class);
 });

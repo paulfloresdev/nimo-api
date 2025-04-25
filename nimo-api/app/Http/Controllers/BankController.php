@@ -106,7 +106,7 @@ class BankController extends Controller
         $bank->save();
 
         return response()->json([
-            'message' => 'Actualización exitosa',
+            'message' => 'Recurso actualizado exitosamente',
             'data' => $bank
         ], 200);
     }
