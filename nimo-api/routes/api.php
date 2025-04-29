@@ -9,6 +9,8 @@ use App\Http\Controllers\BankController;
 use App\Http\Controllers\CardController;
 use App\Http\Controllers\TransactionTypeController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\TransactionController;
 
 // AUTH
 Route::post('/auth/signup', [AuthController::class, 'register']);
@@ -33,12 +35,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('banks', BankController::class);
     Route::post('/banks/{id}/update', [BankController::class, 'update']);
 
-    // CARD
+    // CARDS
     Route::apiResource('cards', CardController::class);
 
     // TRANSACTION TYPES
     Route::apiResource('transaction-types', TransactionTypeController::class);
 
-    // CONTACT
+    // CONTACTS
     Route::apiResource('contacts', ContactController::class);
+
+    // CATEGORIES
+    Route::apiResource('categories', CategoryController::class);
+
+    // TRANSACTIONS
+    Route::apiResource('transactions', TransactionController::class);
+    Route::post('/transactions/balances/', [TransactionController::class, 'update']);
 });

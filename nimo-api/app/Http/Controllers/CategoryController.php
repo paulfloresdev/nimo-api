@@ -33,10 +33,12 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|max:24',
+            'icon' => 'required|max:24',
         ]);
 
         $category = Category::create([
-            'name' => $request->name
+            'name' => $request->name,
+            'icon' => $request->icon
         ]);
 
         return response()->json([
@@ -71,6 +73,7 @@ class CategoryController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|max:24',
+            'icon' => 'required|max:24',
         ]);
 
         $category = Category::findOrFail($id);
@@ -82,7 +85,8 @@ class CategoryController extends Controller
         }
 
         $category->update([
-            'name' => $request->name
+            'name' => $request->name,
+            'icon' => $request->icon
         ]);
 
         return response()->json([
