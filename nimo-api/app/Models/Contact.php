@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Contact extends Model
 {
@@ -22,5 +23,10 @@ class Contact extends Model
     public function type()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function incomeRelations(): HasMany
+    {
+        return $this->hasMany(IncomeRelation::class);
     }
 }

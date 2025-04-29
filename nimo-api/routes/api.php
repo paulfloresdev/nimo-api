@@ -11,6 +11,8 @@ use App\Http\Controllers\TransactionTypeController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\IncomeRelationController;
+use App\Models\IncomeRelation;
 
 // AUTH
 Route::post('/auth/signup', [AuthController::class, 'register']);
@@ -49,5 +51,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // TRANSACTIONS
     Route::apiResource('transactions', TransactionController::class);
-    Route::post('/transactions/balances/', [TransactionController::class, 'update']);
+    Route::get('/getMonthsWith', [TransactionController::class, 'getMonthsWith']);
+    Route::get('/getCardsBalance/{year}/{month}', [TransactionController::class, 'getCardsBalance']);
+    Route::get('/getMonthBalance/{year}/{month}', [TransactionController::class, 'getMonthBalance']);
+    Route::get('/getTransactions/{year}/{month}', [TransactionController::class, 'getTransactions']);
+
+    // INCOME RELATIONS
+    Route::apiResource('income-relations', IncomeRelationController::class);
 });

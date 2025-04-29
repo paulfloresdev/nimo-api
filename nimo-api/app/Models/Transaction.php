@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Transaction extends Model
 {
@@ -51,6 +52,16 @@ class Transaction extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function incomeRelationsFrom()
+    {
+        return $this->hasMany(IncomeRelation::class, 'from_id');
+    }
+
+    public function incomeRelationsTo()
+    {
+        return $this->hasMany(IncomeRelation::class, 'to_id');
     }
 
 }
