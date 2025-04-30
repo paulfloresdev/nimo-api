@@ -17,6 +17,8 @@ class TransactionController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+
         $validated = $request->validate([
             'concept' => 'required|string|max:64',
             'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
@@ -25,9 +27,7 @@ class TransactionController extends Controller
             'place' => 'sometimes|max:64',
             'notes' => 'sometimes|max:128',
             'category_id' => 'required|numeric',
-            'type_id' => 'required|numeric',
-            'card_id' => 'required|numeric',
-            'user_id' => 'required|numeric',
+            'type_id' => 'required|numeric'
         ]);
 
         $transaction = Transaction::create([
@@ -40,7 +40,7 @@ class TransactionController extends Controller
             'category_id' => $request->category_id,
             'type_id' => $request->type_id,
             'card_id' => $request->card_id,
-            'user_id' => $request->user_id
+            'user_id' => $user->id
         ]);
 
         return response()->json([

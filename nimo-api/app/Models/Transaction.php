@@ -64,4 +64,8 @@ class Transaction extends Model
         return $this->hasMany(IncomeRelation::class, 'to_id');
     }
 
+    public function record(){
+        return $this->hasOne(RecurringRecord::class);
+    }
+
 }

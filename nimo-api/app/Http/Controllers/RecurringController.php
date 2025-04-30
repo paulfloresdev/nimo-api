@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Contact;
+use App\Models\Recurring;
 
-class ContactController extends Controller
+class RecurringController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -14,9 +14,9 @@ class ContactController extends Controller
     {
         $user = $request->user();
 
-        $contacts = Contact::where('user_id', $user->id)->paginate(20);
+        $recurrings = Recurring::where('user_id', $user->id)->paginate(20);
 
-        if ($contacts->isEmpty()) {
+        if ($recurrings->isEmpty()) {
             return response()->json([
                 'message' => 'No se encontraron los recursos solicitados.',
             ], 404);
@@ -24,7 +24,7 @@ class ContactController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $contacts
+            'data' => $recurrings
         ], 200);
     }
 
@@ -32,21 +32,29 @@ class ContactController extends Controller
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
-    {   
+    {
         $user = $request->user();
 
         $validated = $request->validate([
-            'alias' => 'required|max:32'
+            'concept' => 'required|string|max:64',
+            'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],     
+            'category_id' => 'required|numeric',
+            'type_id' => 'required|numeric'
         ]);
 
-        $contact = Contact::create([
-            'alias' => $request->alias,
+        $recurring = Recurring::create([
+            'concept' => $request->concept,
+            'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
+            'category_id' => $request->category_id,
+            'type_id' => $request->type_id,
             'user_id' => $user->id
         ]);
 
+        $recurring->with(['category', 'type']);
+
         return response()->json([
             'message' => 'Recurso almacenado exitosamente.',
-            'data' => $contact
+            'data' => $recurring
         ], 201);
     }
 
@@ -55,9 +63,9 @@ class ContactController extends Controller
      */
     public function show(string $id)
     {
-        $contact = Contact::find($id);
+        $recurring = Recurring::find($id);
 
-        if ($contact == null) {
+        if ($recurring == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso solicitado.',
             ], 404);
@@ -65,54 +73,55 @@ class ContactController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $contact
+            'data' => $recurring
         ], 200);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, $id)
     {
         $user = $request->user();
 
         $validated = $request->validate([
-            'alias' => 'required|max:32'
+            'concept' => 'required|string|max:64',
+            'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'category_id' => 'required|numeric',
+            'type_id' => 'required|numeric'
         ]);
 
-        $contact = Contact::findOrFail($id);
+        $recurring = Recurring::findOrFail($id);
 
-        if ($contact == null) {
-            return response()->json([
-                'message' => 'No se encontró el recurso que busca actualizar.',
-            ], 404);
-        }
-
-        $contact->update([
-            'alias' => $request->alias,
+        $recurring->update([
+            'concept' => $request->concept,
+            'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
+            'category_id' => $request->category_id, // corregido aquí
+            'type_id' => $request->type_id,
             'user_id' => $user->id
         ]);
 
         return response()->json([
             'message' => 'Recurso actualizado exitosamente.',
-            'data' => $contact
-        ], 200);
+            'data' => $recurring
+        ]);
     }
+
 
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
     {
-        $contact = Contact::findOrFail($id);
+        $recurring = Recurring::find($id);
 
-        if ($contact == null) {
+        if ($recurring == null) {
             return response()->json([
                 'message' => 'No se encontró el recurso que busca eliminar.',
             ], 404);
         }
 
-        $contact->delete();
+        $recurring->delete();
 
         return response()->json([
             'message' => 'Recurso eliminado exitosamente.'

@@ -203,4 +203,38 @@ class IncomeRelationController extends Controller
             'message' => 'Recurso eliminado exitosamente.'
         ], 200);
     }
+
+    public function verifyIncomeRelation(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'to_id' => 'required|numeric',
+        ]);
+
+        $expense = Transaction::find($request->to_id);
+
+        if($expense == null){
+            return response()->json([
+                'message' => 'La transacción destinataria no existe.',
+            ], 409);
+        }
+
+        if($expense->type_id != 2){
+            return response()->json([
+                'message' => 'La transacción destinataria no es un gasto.',
+            ], 409);
+        }
+
+        $sumIr = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
+
+        if((-1) * $expense->amount < $sumIr){
+            return response()->json([
+                'message' => 'La transacción que intenta vincular junto a los demás pagos vinculados, supera el importe del gasto.',
+            ], 409);
+        }
+
+        return response()->json([
+            'message' => 'Verificación pasada con éxito.'
+        ], 200);
+    }
 }

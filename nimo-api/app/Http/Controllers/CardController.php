@@ -39,13 +39,14 @@ class CardController extends Controller
      */
     public function store(Request $request)
     {
+        $user = $request->user();
+
         $validated = $request->validate([
             'numbers' => 'required|string|size:4',
             'color' => 'required|string|size:7',
             'type_id' => 'required|integer|exists:account_types,id',
             'bank_id' => 'required|integer|exists:banks,id',
             'network_id' => 'required|integer|exists:networks,id',
-            'user_id' => 'required|integer|exists:users,id',
         ]);
 
         $card = Card::create([
@@ -54,7 +55,7 @@ class CardController extends Controller
             'type_id' => $request->type_id,
             'bank_id' => $request->bank_id,
             'network_id' => $request->network_id,
-            'user_id' => $request->user_id,
+            'user_id' => $user->id,
         ]);
 
         return response()->json([
@@ -93,7 +94,6 @@ class CardController extends Controller
             'type_id' => 'sometimes|integer|exists:account_types,id',
             'bank_id' => 'sometimes|integer|exists:banks,id',
             'network_id' => 'sometimes|integer|exists:networks,id',
-            'user_id' => 'sometimes|integer|exists:users,id',
         ]);
 
         $card = Card::findOrFail($id);
@@ -110,7 +110,6 @@ class CardController extends Controller
             'type_id' => $request->type_id,
             'bank_id' => $request->bank_id,
             'network_id' => $request->network_id,
-            'user_id' => $request->user_id,
         ]);
 
         return response()->json([

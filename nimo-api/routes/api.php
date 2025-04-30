@@ -12,7 +12,8 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\IncomeRelationController;
-use App\Models\IncomeRelation;
+use App\Http\Controllers\RecurringController;
+use App\Http\Controllers\RecurringRecordController;
 
 // AUTH
 Route::post('/auth/signup', [AuthController::class, 'register']);
@@ -58,4 +59,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // INCOME RELATIONS
     Route::apiResource('income-relations', IncomeRelationController::class);
+    Route::get('/verify-income-relation', [IncomeRelationController::class, 'verifyIncomeRelation']);
+
+    // RECURRINGS
+    Route::apiResource('recurrings', RecurringController::class);
+
+    // RECURRING RECORDS
+    Route::apiResource('recurring-records', RecurringRecordController::class);
+
 });
