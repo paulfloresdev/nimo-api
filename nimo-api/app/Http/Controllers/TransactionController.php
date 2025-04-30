@@ -49,6 +49,101 @@ class TransactionController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, string $id)
+    {
+        $validated = $request->validate([
+            'concept' => 'required|string|max:64',
+            'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'transaction_date' => 'required|date',
+            'accounting_date' => 'required|date',
+            'place' => 'sometimes|max:64',
+            'notes' => 'sometimes|max:128',
+            'category_id' => 'required|numeric',
+            'card_id' => 'required|numeric',
+        ]);
+
+        $transaction = Transaction::findOrFail($id);
+
+        $isIncome = $transaction->type_id == 1;
+        $absAmount = $validated['amount'];
+
+        // Validación de ingresos (type_id == 1)
+        if ($isIncome) {
+            $mainRt = IncomeRelation::where('from_id', $id)->first();
+            if ($mainRt) {
+                $expense = Transaction::find($mainRt->to_id);
+                $sumOtherRelations = IncomeRelation::where('to_id', $expense->id)
+                    ->where('from_id', '!=', $id)
+                    ->sum('amount');
+                $newTotal = $sumOtherRelations + $absAmount;
+
+                if ((-1 * $expense->amount) < $newTotal) {
+                    return response()->json([
+                        'message' => 'La actualización del importe provoca que la sumatoria de ingresos vinculados supere el importe del gasto.',
+                    ], 409);
+                }
+
+                $mainRt->amount = $absAmount;
+                $mainRt->save();
+            }
+        }
+
+        // Validación de egresos (type_id != 1)
+        if (!$isIncome) {
+            $relations = IncomeRelation::where('to_id', $id)->get();
+            if ($relations->isNotEmpty()) {
+                $sumRt = $relations->sum('amount');
+                if ($absAmount < $sumRt) {
+                    return response()->json([
+                        'message' => 'La actualización del importe del gasto es menor a la sumatoria de sus ingresos vinculados.',
+                    ], 409);
+                }
+            }
+        }
+
+        // Actualiza los campos (excepto amount que depende del signo)
+        $transaction->fill(array_merge(
+            $validated,
+            ['amount' => $isIncome ? $absAmount : $absAmount * -1]
+        ));
+
+        $transaction->save();
+
+        return response()->json([
+            'message' => 'Recurso actualizado exitosamente.',
+            'data' => $transaction
+        ], 200);
+    }
+
+    public function destroy(string $id)
+    {
+        $transaction = Transaction::findOrFail($id);
+
+        // Validaciones de ingresos
+        if ($transaction->type_id == 1) {
+            // Elimina la relación si existe
+            IncomeRelation::where('from_id', $id)->delete();
+        }
+
+        // Validaciones de egresos
+        if ($transaction->type_id == 2) {
+            // Obtiene y elimina relaciones vinculadas
+            $fromIds = IncomeRelation::where('to_id', $id)->pluck('from_id');
+
+            if ($fromIds->isNotEmpty()) {
+                IncomeRelation::where('to_id', $id)->delete();
+                Transaction::whereIn('id', $fromIds)->delete(); // Elimina ingresos relacionados
+            }
+        }
+
+        // Elimina la transacción principal
+        $transaction->delete();
+
+        return response()->json([
+            'message' => 'Recurso eliminado exitosamente.'
+        ], 200);
+    }
+
     public function getMonthsWith(Request $request)
     {
         $validated = $request->validate([

@@ -58,6 +58,7 @@ class IncomeRelationController extends Controller
             });
 
         return response()->json([
+            'message' => 'Consulta realizada exitosamente',
             'data' => $relations
         ]);
     }
@@ -77,23 +78,27 @@ class IncomeRelationController extends Controller
         ]);
         
         $fromTr = Transaction::find($request->from_id);
-
-        if($fromTr != null){
+        if($fromTr->type_id != 1){
             return response()->json([
-                'message' => 'La transacción emisora ya está vinculada a otro destinatario.',
+                'message' => 'La transacción emirosra no es un ingreso.',
             ], 409);
         }
 
         $toTr = Transaction::find($request->to_id);
-
         if($toTr->type_id != 2){
             return response()->json([
                 'message' => 'La transacción destinataria no es un gasto.',
             ], 409);
         }
 
-        $toRelations = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
+        $fromRd = IncomeRelation::where('from_id', $fromTr->id)->first();
+        if($fromRd != null){
+            return response()->json([
+                'message' => 'La transacción emisora ya está vinculada a otro destinatario.',
+            ], 409);
+        }
 
+        $toRelations = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
         if(((-1) * $toTr->amount) < $toRelations){
             return response()->json([
                 'message' => 'La sumatoria de pagos vinculados supera el monto del gasto destinatario.',

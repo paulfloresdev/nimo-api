@@ -10,9 +10,11 @@ class ContactController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $contacts = Contact::all();
+        $user = $request->user();
+
+        $contacts = Contact::where('user_id', $user->id)->paginate(20);
 
         if ($contacts->isEmpty()) {
             return response()->json([

@@ -10,9 +10,11 @@ class CardController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $cards = Card::all();
+        $user = $request->user();
+
+        $cards = Card::where('user_id', $user->id)->get();
 
         if ($cards->isEmpty()) {
             return response()->json([
@@ -20,11 +22,17 @@ class CardController extends Controller
             ], 404);
         }
 
+        // Agrupar por type_id
+        $grouped = $cards->groupBy('type_id')->map(function ($group) {
+            return $group->values(); // resetear los índices
+        });
+
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $cards
+            'data' => $grouped
         ], 200);
     }
+
 
     /**
      * Store a newly created resource in storage.
