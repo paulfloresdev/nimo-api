@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Recurring;
+use App\Models\RecurringRecord;
+use App\Models\Transaction;
 
 class RecurringController extends Controller
 {
@@ -93,12 +95,29 @@ class RecurringController extends Controller
 
         $recurring = Recurring::findOrFail($id);
 
+        $adjustedAmount = ($request->type_id == 1) ? $request->amount : $request->amount * (-1);
+
+        // Actualizar el recurring
         $recurring->update([
             'concept' => $request->concept,
-            'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
-            'category_id' => $request->category_id, // corregido aquí
+            'amount' => $adjustedAmount,
+            'category_id' => $request->category_id,
             'type_id' => $request->type_id,
             'user_id' => $user->id
+        ]);
+
+        // Buscar los records relacionados
+        $records = RecurringRecord::where('recurring_id', $id)->get();
+
+        // Obtener los IDs de las transacciones
+        $transactionIds = $records->pluck('transaction_id');
+
+        // Actualizar todas las transacciones relacionadas
+        Transaction::whereIn('id', $transactionIds)->update([
+            'concept' => $request->concept,
+            'amount' => $adjustedAmount,
+            'category_id' => $request->category_id,
+            'type_id' => $request->type_id
         ]);
 
         return response()->json([
@@ -108,6 +127,7 @@ class RecurringController extends Controller
     }
 
 
+
     /**
      * Remove the specified resource from storage.
      */
@@ -115,16 +135,30 @@ class RecurringController extends Controller
     {
         $recurring = Recurring::find($id);
 
-        if ($recurring == null) {
+        if (!$recurring) {
             return response()->json([
                 'message' => 'No se encontró el recurso que busca eliminar.',
             ], 404);
         }
 
+        // Obtener los registros relacionados
+        $records = RecurringRecord::where('recurring_id', $recurring->id)->get();
+
+        // Obtener los IDs de las transacciones asociadas
+        $transactionIds = $records->pluck('transaction_id');
+
+        // Eliminar las transacciones
+        Transaction::whereIn('id', $transactionIds)->delete();
+
+        // Eliminar los registros recurrentes
+        RecurringRecord::where('recurring_id', $recurring->id)->delete();
+
+        // Finalmente eliminar el recurring
         $recurring->delete();
 
         return response()->json([
             'message' => 'Recurso eliminado exitosamente.'
         ], 200);
     }
+
 }

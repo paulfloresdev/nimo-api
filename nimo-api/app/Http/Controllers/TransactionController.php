@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 use App\Models\Transaction;
 use App\Models\Card;
 use App\Models\IncomeRelation;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use App\Models\RecurringRecord;
 
 class TransactionController extends Controller
 {
@@ -136,6 +136,12 @@ class TransactionController extends Controller
             }
         }
 
+        //Validacion si es recurrente
+        $recurring = RecurringRecord::where('transaction_id', $id)->first();
+        if($recurring != null){
+            $recurring->delete();
+        }
+
         // Elimina la transacción principal
         $transaction->delete();
 
@@ -143,6 +149,31 @@ class TransactionController extends Controller
             'message' => 'Recurso eliminado exitosamente.'
         ], 200);
     }
+
+    public function getYearsWith(Request $request)
+    {
+        $validated = $request->validate([
+            'year' => 'sometimes|string|max:4'
+        ]);
+
+        $user = $request->user();
+
+        $years = Transaction::without(['category', 'type', 'card', 'user'])
+            ->where('user_id', $user->id)
+            ->when($validated['year'] ?? null, function ($query, $year) {
+                $query->whereYear('accounting_date', $year);
+            })
+            ->selectRaw('YEAR(accounting_date) as year')
+            ->groupBy('year')
+            ->orderByDesc('year')
+            ->pluck('year');
+
+        return response()->json([
+            'message' => 'Consulta realizada exitosamente',
+            'data' => $years
+        ], 200);
+    }
+
 
     public function getMonthsWith(Request $request)
     {
@@ -352,101 +383,101 @@ class TransactionController extends Controller
     }
 
     public function getTransactions($year, $month, Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $validated = $request->validate([
-        'concept' => 'sometimes|string|max:64',
-        'amount' => ['sometimes', 'regex:/^\d+(\.\d{1,2})?$/'],
-        'category_id' => 'sometimes|integer',
-        'type_id' => 'sometimes|integer',
-        'card_id' => 'sometimes|integer',
-        'order_by' => 'required|integer|in:1,2,3,4,5,6',
-        'per_page' => 'sometimes|integer|min:1|max:100'
-    ]);
+        $validated = $request->validate([
+            'concept' => 'sometimes|string|max:64',
+            'amount' => ['sometimes', 'regex:/^\d+(\.\d{1,2})?$/'],
+            'category_id' => 'sometimes|integer',
+            'type_id' => 'sometimes|integer',
+            'card_id' => 'sometimes|integer',
+            'order_by' => 'required|integer|in:1,2,3,4,5,6',
+            'per_page' => 'sometimes|integer|min:1|max:100'
+        ]);
 
-    $query = Transaction::with([
-            'category',
-            'type',
-            'card' => function ($query) {
-                $query->without('user');
-            }
-        ])
-        ->withCount(['incomeRelationsFrom', 'incomeRelationsTo']) // Conteos de relaciones
-        ->without(['user'])
-        ->where('user_id', $user->id)
-        ->whereYear('accounting_date', $year)
-        ->whereMonth('accounting_date', $month);
+        $query = Transaction::with([
+                'category',
+                'type',
+                'card' => function ($query) {
+                    $query->without('user');
+                }
+            ])
+            ->withCount(['incomeRelationsFrom', 'incomeRelationsTo']) // Conteos de relaciones
+            ->without(['user'])
+            ->where('user_id', $user->id)
+            ->whereYear('accounting_date', $year)
+            ->whereMonth('accounting_date', $month);
 
-    if (!empty($validated['concept'])) {
-        $query->where('concept', 'LIKE', '%' . $validated['concept'] . '%');
+        if (!empty($validated['concept'])) {
+            $query->where('concept', 'LIKE', '%' . $validated['concept'] . '%');
+        }
+
+        if (!empty($validated['amount'])) {
+            $query->where('amount', $validated['amount']);
+        }
+
+        if (!empty($validated['category_id'])) {
+            $query->where('category_id', $validated['category_id']);
+        }
+
+        if (!empty($validated['type_id'])) {
+            $query->where('type_id', $validated['type_id']);
+        }
+
+        if (!empty($validated['card_id'])) {
+            $query->where('card_id', $validated['card_id']);
+        }
+
+        // Ordenamiento
+        switch ($validated['order_by']) {
+            case 1:
+                $query->orderBy('accounting_date', 'asc');
+                break;
+            case 2:
+                $query->orderBy('accounting_date', 'desc');
+                break;
+            case 3:
+                $query->orderBy('transaction_date', 'asc');
+                break;
+            case 4:
+                $query->orderBy('transaction_date', 'desc');
+                break;
+            case 5:
+                $query->orderBy('created_at', 'asc');
+                break;
+            case 6:
+                $query->orderBy('created_at', 'desc');
+                break;
+        }
+
+        $perPage = $validated['per_page'] ?? 20;
+
+        $transactions = $query->paginate($perPage);
+
+        $transactions->setCollection(
+            $transactions->getCollection()->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'concept' => $t->concept,
+                    'amount' => $t->amount,
+                    'transaction_date' => $t->transaction_date,
+                    'accounting_date' => $t->accounting_date,
+                    'category_icon' => optional($t->category)->icon,
+                    'card_bank_name' => $t->card->bank->name ?? null,
+                    'card_numbers' => $t->card->numbers,
+                    'card_type' => $t->card->type->type ?? null,
+                    'card_network' => $t->card->network->img_path ?? null,
+                    'income_relation_count' => $t->income_relations_from_count + $t->income_relations_to_count,
+                ];
+            })
+        );
+
+        return response()->json([
+            'message' => 'Consulta realizada exitosamente.',
+            'data' => $transactions
+        ]);
     }
-
-    if (!empty($validated['amount'])) {
-        $query->where('amount', $validated['amount']);
-    }
-
-    if (!empty($validated['category_id'])) {
-        $query->where('category_id', $validated['category_id']);
-    }
-
-    if (!empty($validated['type_id'])) {
-        $query->where('type_id', $validated['type_id']);
-    }
-
-    if (!empty($validated['card_id'])) {
-        $query->where('card_id', $validated['card_id']);
-    }
-
-    // Ordenamiento
-    switch ($validated['order_by']) {
-        case 1:
-            $query->orderBy('accounting_date', 'asc');
-            break;
-        case 2:
-            $query->orderBy('accounting_date', 'desc');
-            break;
-        case 3:
-            $query->orderBy('transaction_date', 'asc');
-            break;
-        case 4:
-            $query->orderBy('transaction_date', 'desc');
-            break;
-        case 5:
-            $query->orderBy('created_at', 'asc');
-            break;
-        case 6:
-            $query->orderBy('created_at', 'desc');
-            break;
-    }
-
-    $perPage = $validated['per_page'] ?? 20;
-
-    $transactions = $query->paginate($perPage);
-
-    $transactions->setCollection(
-        $transactions->getCollection()->map(function ($t) {
-            return [
-                'id' => $t->id,
-                'concept' => $t->concept,
-                'amount' => $t->amount,
-                'transaction_date' => $t->transaction_date,
-                'accounting_date' => $t->accounting_date,
-                'category_icon' => optional($t->category)->icon,
-                'card_bank_name' => $t->card->bank->name ?? null,
-                'card_numbers' => $t->card->numbers,
-                'card_type' => $t->card->type->type ?? null,
-                'card_network' => $t->card->network->img_path ?? null,
-                'income_relation_count' => $t->income_relations_from_count + $t->income_relations_to_count,
-            ];
-        })
-    );
-
-    return response()->json([
-        'message' => 'Consulta realizada exitosamente.',
-        'data' => $transactions
-    ]);
-}
 
 
 }
