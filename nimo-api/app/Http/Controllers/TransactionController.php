@@ -178,7 +178,7 @@ class TransactionController extends Controller
     public function getMonthsWith(Request $request)
     {
         $validated = $request->validate([
-            'year' => 'sometimes|string|max:4'
+            'year' => 'sometimes|numeric'
         ]);
 
         $user = $request->user();
@@ -190,12 +190,13 @@ class TransactionController extends Controller
             })
             ->selectRaw('YEAR(accounting_date) as year, MONTH(accounting_date) as month')
             ->groupBy('year', 'month')
-            ->orderByDesc('year')
-            ->orderByDesc('month')
+            ->orderBy('year')
+            ->orderBy('month')
             ->paginate(12);
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente',
+            'year' => $request->year,
             'data' => $dates
         ], 200);
     }

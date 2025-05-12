@@ -53,7 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // TRANSACTIONS
     Route::apiResource('transactions', TransactionController::class);
     Route::get('/getYearsWith', [TransactionController::class, 'getYearsWith']);
-    Route::get('/getMonthsWith', [TransactionController::class, 'getMonthsWith']);
+    Route::post('/getMonthsWith', [TransactionController::class, 'getMonthsWith']);
     Route::get('/getCardsBalance/{year}/{month}', [TransactionController::class, 'getCardsBalance']);
     Route::get('/getMonthBalance/{year}/{month}', [TransactionController::class, 'getMonthBalance']);
     Route::get('/getTransactions/{year}/{month}', [TransactionController::class, 'getTransactions']);
