@@ -29,7 +29,10 @@ class CardController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
-            'data' => $grouped
+            'data' => [
+                'debit' => $grouped->first(),
+                'credit' => $grouped->last()
+            ]
         ], 200);
     }
 

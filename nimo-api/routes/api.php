@@ -56,7 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/getMonthsWith', [TransactionController::class, 'getMonthsWith']);
     Route::get('/getCardsBalance/{year}/{month}', [TransactionController::class, 'getCardsBalance']);
     Route::get('/getMonthBalance/{year}/{month}', [TransactionController::class, 'getMonthBalance']);
-    Route::get('/getTransactions/{year}/{month}', [TransactionController::class, 'getTransactions']);
+    Route::post('/getTransactions/{year}/{month}', [TransactionController::class, 'getTransactions']);
 
     // INCOME RELATIONS
     Route::apiResource('income-relations', IncomeRelationController::class);
