@@ -67,5 +67,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // RECURRING RECORDS
     Route::apiResource('recurring-records', RecurringRecordController::class);
-
 });

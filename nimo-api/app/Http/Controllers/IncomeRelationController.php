@@ -16,6 +16,7 @@ class IncomeRelationController extends Controller
         $validated = $request->validate([
             'from_id' => 'sometimes|numeric',
             'to_id' => 'sometimes|numeric',
+            'contact_id' => 'sometimes|numeric', // Nueva validación
         ]);
 
         $query = IncomeRelation::query();
@@ -28,9 +29,21 @@ class IncomeRelationController extends Controller
             $query->where('to_id', $request->to_id);
         }
 
-        $relations = $query->with(['fromTransaction.category', 'fromTransaction.card.bank', 'fromTransaction.card.type', 'fromTransaction.card.network', 
-                                'toTransaction.category', 'toTransaction.card.bank', 'toTransaction.card.type', 'toTransaction.card.network',
-                                'contact'])
+        if ($request->has('contact_id')) { // Nuevo filtro
+            $query->where('contact_id', $request->contact_id);
+        }
+
+        $relations = $query->with([
+            'fromTransaction.category',
+            'fromTransaction.card.bank',
+            'fromTransaction.card.type',
+            'fromTransaction.card.network',
+            'toTransaction.category',
+            'toTransaction.card.bank',
+            'toTransaction.card.type',
+            'toTransaction.card.network',
+            'contact'
+        ])
             ->get()
             ->map(function ($relation) {
                 $transform = function ($t) {
@@ -76,35 +89,35 @@ class IncomeRelationController extends Controller
             'to_id' => 'required|numeric',
             'contact_id' => 'required|numeric',
         ]);
-        
+
         $fromTr = Transaction::find($request->from_id);
-        if($fromTr->type_id != 1){
+        if ($fromTr->type_id != 1) {
             return response()->json([
                 'message' => 'La transacción emirosra no es un ingreso.',
             ], 409);
         }
 
         $toTr = Transaction::find($request->to_id);
-        if($toTr->type_id != 2){
+        if ($toTr->type_id != 2) {
             return response()->json([
                 'message' => 'La transacción destinataria no es un gasto.',
             ], 409);
         }
 
         $fromRd = IncomeRelation::where('from_id', $fromTr->id)->first();
-        if($fromRd != null){
+        if ($fromRd != null) {
             return response()->json([
                 'message' => 'La transacción emisora ya está vinculada a otro destinatario.',
             ], 409);
         }
 
         $toRelations = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
-        if(((-1) * $toTr->amount) < $toRelations){
+        if (((-1) * $toTr->amount) < $toRelations) {
             return response()->json([
                 'message' => 'La sumatoria de pagos vinculados supera el monto del gasto destinatario.',
             ], 400);
         }
-        
+
         $incomeRelation = IncomeRelation::create([
             'amount' => $request->amount,
             'from_id' => $request->from_id,
@@ -117,7 +130,7 @@ class IncomeRelationController extends Controller
             'toRelations' => $toRelations,
             'toTrAmount' => $toTr->amount,
             'data' => $incomeRelation
-            
+
         ], 201);
     }
 
@@ -154,7 +167,7 @@ class IncomeRelationController extends Controller
 
         $toTr = Transaction::find($request->to_id);
 
-        if($toTr->type_id != 2){
+        if ($toTr->type_id != 2) {
             return response()->json([
                 'message' => 'La transacción destinataria no es un gasto.',
             ], 400);
@@ -162,12 +175,12 @@ class IncomeRelationController extends Controller
 
         $toRelations = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
 
-        if(((-1) * $toTr->amount) < $toRelations){
+        if (((-1) * $toTr->amount) < $toRelations) {
             return response()->json([
                 'message' => 'La sumatoria de pagos vinculados supera el monto del gasto destinatario.',
             ], 400);
         }
-        
+
         $incomeRelation = IncomeRelation::update([
             'amount' => $request->amount,
             'from_id' => $request->from_id,
@@ -180,7 +193,7 @@ class IncomeRelationController extends Controller
             'toRelations' => $toRelations,
             'toTrAmount' => $toTr->amount,
             'data' => $incomeRelation
-            
+
         ], 200);
     }
 
@@ -213,13 +226,13 @@ class IncomeRelationController extends Controller
 
         $expense = Transaction::find($request->to_id);
 
-        if($expense == null){
+        if ($expense == null) {
             return response()->json([
                 'message' => 'La transacción destinataria no existe.',
             ], 409);
         }
 
-        if($expense->type_id != 2){
+        if ($expense->type_id != 2) {
             return response()->json([
                 'message' => 'La transacción destinataria no es un gasto.',
             ], 409);
@@ -227,7 +240,7 @@ class IncomeRelationController extends Controller
 
         $sumIr = IncomeRelation::where('to_id', $request->to_id)->sum('amount') + $request->amount;
 
-        if((-1) * $expense->amount < $sumIr){
+        if ((-1) * $expense->amount < $sumIr) {
             return response()->json([
                 'message' => 'La transacción que intenta vincular junto a los demás pagos vinculados, supera el importe del gasto.',
             ], 409);

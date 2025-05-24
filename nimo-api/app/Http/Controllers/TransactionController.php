@@ -49,6 +49,22 @@ class TransactionController extends Controller
         ], 201);
     }
 
+    public function show(string $id)
+    {
+        $transaction = Transaction::find($id);
+
+        if ($transaction == null) {
+            return response()->json([
+                'message' => 'No se encontró el recurso solicitado.',
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Consulta realizada exitosamente.',
+            'data' => $transaction
+        ], 200);
+    }
+
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
@@ -138,7 +154,7 @@ class TransactionController extends Controller
 
         //Validacion si es recurrente
         $recurring = RecurringRecord::where('transaction_id', $id)->first();
-        if($recurring != null){
+        if ($recurring != null) {
             $recurring->delete();
         }
 
@@ -310,7 +326,7 @@ class TransactionController extends Controller
         // Fechas límites
         $lastDayPrev = Carbon::createFromDate($year, $month, 1)->subDay()->endOfDay();
         $lastDayCurr = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
-        
+
         $bills = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '>', $lastDayPrev)
             ->where('accounting_date', '<=', $lastDayCurr)
@@ -333,7 +349,7 @@ class TransactionController extends Controller
             })
             ->sum('amount');
 
-            $initialBalance = Transaction::where('user_id', $user->id)
+        $initialBalance = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '<=', $lastDayPrev)
             ->whereIn('card_id', function ($query) {
                 $query->select('id')
@@ -363,7 +379,7 @@ class TransactionController extends Controller
             ->sum('amount');
 
         $finalBalance = $initialBalance + $incomes + $expenses;
-        
+
         return response()->json([
             'message' => 'Balance del mes obtenido exitosamente',
             'data' => [
@@ -398,12 +414,12 @@ class TransactionController extends Controller
         ]);
 
         $query = Transaction::with([
-                'category',
-                'type',
-                'card' => function ($query) {
-                    $query->without('user');
-                }
-            ])
+            'category',
+            'type',
+            'card' => function ($query) {
+                $query->without('user');
+            }
+        ])
             ->withCount(['incomeRelationsFrom', 'incomeRelationsTo']) // Conteos de relaciones
             ->without(['user'])
             ->where('user_id', $user->id)
@@ -481,6 +497,4 @@ class TransactionController extends Controller
             'data' => $transactions
         ]);
     }
-
-
 }
