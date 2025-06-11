@@ -16,7 +16,10 @@ class IncomeRelationController extends Controller
         $validated = $request->validate([
             'from_id' => 'sometimes|numeric',
             'to_id' => 'sometimes|numeric',
-            'contact_id' => 'sometimes|numeric', // Nueva validación
+            'contact_id' => 'sometimes|numeric',
+            'month' => 'sometimes|numeric|min:1|max:12',
+            'year' => 'sometimes|numeric|min:1900',
+            'page' => 'sometimes|numeric|min:1',
         ]);
 
         $query = IncomeRelation::query();
@@ -29,11 +32,21 @@ class IncomeRelationController extends Controller
             $query->where('to_id', $request->to_id);
         }
 
-        if ($request->has('contact_id')) { // Nuevo filtro
+        if ($request->has('contact_id')) {
             $query->where('contact_id', $request->contact_id);
         }
 
-        $relations = $query->with([
+        if ($request->has('month') && $request->has('year')) {
+            $query->whereHas('fromTransaction', function ($q) use ($request) {
+                $q->whereMonth('transaction_date', $request->month)
+                    ->whereYear('transaction_date', $request->year);
+            });
+        }
+
+        // Define el número de elementos por página según si hay filtros de fecha
+        $perPage = ($request->has('month') && $request->has('year')) ? 10 : 5;
+
+        $paginatedRelations = $query->with([
             'fromTransaction.category',
             'fromTransaction.card.bank',
             'fromTransaction.card.type',
@@ -43,38 +56,52 @@ class IncomeRelationController extends Controller
             'toTransaction.card.type',
             'toTransaction.card.network',
             'contact'
-        ])
-            ->get()
-            ->map(function ($relation) {
-                $transform = function ($t) {
-                    return [
-                        'id' => $t->id,
-                        'concept' => $t->concept,
-                        'amount' => $t->amount,
-                        'transaction_date' => $t->transaction_date,
-                        'accounting_date' => $t->accounting_date,
-                        'category_icon' => optional($t->category)->icon,
-                        'card_bank_name' => $t->card->bank->name ?? null,
-                        'card_numbers' => $t->card->numbers,
-                        'card_type' => $t->card->type->type ?? null,
-                        'card_network' => $t->card->network->img_path ?? null,
-                    ];
-                };
+        ])->paginate($perPage);
 
+
+        $transformedData = $paginatedRelations->getCollection()->map(function ($relation) {
+            $transform = function ($t) {
                 return [
-                    'id' => $relation->id,
-                    'amount' => $relation->amount,
-                    'contact' => $relation->contact,
-                    'from_transaction' => $relation->fromTransaction ? $transform($relation->fromTransaction) : null,
-                    'to_transaction' => $relation->toTransaction ? $transform($relation->toTransaction) : null,
+                    'id' => $t->id,
+                    'concept' => $t->concept,
+                    'amount' => $t->amount,
+                    'transaction_date' => $t->transaction_date,
+                    'accounting_date' => $t->accounting_date,
+                    'category_icon' => optional($t->category)->icon,
+                    'card_bank_name' => $t->card->bank->name ?? null,
+                    'card_numbers' => $t->card->numbers,
+                    'card_type' => $t->card->type->type ?? null,
+                    'card_network' => $t->card->network->img_path ?? null,
+                    'card_network_name' => $t->card->network->name ?? null,
+                    'updated_at' => $t->updated_at,
+                    'type' => $t->type->type,
+                    'notes' => $t->notes,
                 ];
-            });
+            };
+
+            return [
+                'id' => $relation->id,
+                'amount' => $relation->amount,
+                'contact' => $relation->contact,
+                'from_transaction' => $relation->fromTransaction ? $transform($relation->fromTransaction) : null,
+                'to_transaction' => $relation->toTransaction ? $transform($relation->toTransaction) : null,
+            ];
+        });
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente',
-            'data' => $relations
+            'data' => $transformedData,
+            'pagination' => [
+                'current_page' => $paginatedRelations->currentPage(),
+                'per_page' => $paginatedRelations->perPage(),
+                'total' => $paginatedRelations->total(),
+                'last_page' => $paginatedRelations->lastPage(),
+                'next_page_url' => $paginatedRelations->nextPageUrl(),
+                'prev_page_url' => $paginatedRelations->previousPageUrl(),
+            ]
         ]);
     }
+
 
 
 
