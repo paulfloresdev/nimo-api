@@ -20,7 +20,7 @@ class TransactionController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'concept' => 'required|string|max:64',
+            'concept' => 'required|string|max:32',
             'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
             'transaction_date' => 'required|date',
             'accounting_date' => 'required|date',
@@ -43,8 +43,10 @@ class TransactionController extends Controller
             'user_id' => $user->id
         ]);
 
+        $transaction = Transaction::find($transaction->id);
+
         return response()->json([
-            'message' => 'Recurso almacenado exitosamente.',
+            'message' => 'El movimiento fue almacenado correctamente.',
             'data' => $transaction
         ], 201);
     }
@@ -123,7 +125,8 @@ class TransactionController extends Controller
             ['amount' => $isIncome ? $absAmount : $absAmount * -1]
         ));
 
-        $transaction->save();
+        $transaction->setRelation('user', null);
+        $transaction->card->setRelation('user', null);
 
         return response()->json([
             'message' => 'Recurso actualizado exitosamente.',
@@ -468,11 +471,11 @@ class TransactionController extends Controller
                 break;
         }
 
-        $perPage = $validated['per_page'] ?? 20;
+        $perPage = $validated['per_page'] ?? 10;
 
         $transactions = $query->paginate($perPage);
 
-        $transactions->setCollection(
+        /*$transactions->setCollection(
             $transactions->getCollection()->map(function ($t) {
                 return [
                     'id' => $t->id,
@@ -492,7 +495,7 @@ class TransactionController extends Controller
                     'income_relation_count' => $t->income_relations_from_count + $t->income_relations_to_count,
                 ];
             })
-        );
+        );*/
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente.',
