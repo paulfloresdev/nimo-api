@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Models\Card;
 use App\Models\IncomeRelation;
 use App\Models\RecurringRecord;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class TransactionController extends Controller
 {
@@ -27,23 +28,68 @@ class TransactionController extends Controller
             'place' => 'sometimes|max:64',
             'notes' => 'sometimes|max:128',
             'category_id' => 'required|numeric',
-            'type_id' => 'required|numeric'
+            'type_id' => 'required|numeric',
+            'card_id' => 'required|numeric',
+            'second_card_id' => 'sometimes|numeric'
         ]);
 
-        $transaction = Transaction::create([
+        //  Reservado para Ingresos y gastos
+        if ($request->type_id != 3) {
+            $transaction = Transaction::create([
+                'concept' => $request->concept,
+                'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
+                'transaction_date' => $request->transaction_date,
+                'accounting_date' => $request->accounting_date,
+                'place' => $request->place ?? null,
+                'notes' => $request->notes ?? null,
+                'category_id' => $request->category_id,
+                'type_id' => $request->type_id,
+                'card_id' => $request->card_id,
+                'user_id' => $user->id
+            ]);
+
+            $transaction = Transaction::find($transaction->id);
+
+            return response()->json([
+                'message' => 'El movimiento fue almacenado correctamente.',
+                'data' => $transaction
+            ], 201);
+        }
+
+        $fromTransaction = Transaction::create([
             'concept' => $request->concept,
-            'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
+            'amount' => $request->amount * (-1),
             'transaction_date' => $request->transaction_date,
             'accounting_date' => $request->accounting_date,
             'place' => $request->place ?? null,
             'notes' => $request->notes ?? null,
-            'category_id' => $request->category_id,
-            'type_id' => $request->type_id,
+            'category_id' => 10,
+            'type_id' => 3,
             'card_id' => $request->card_id,
             'user_id' => $user->id
         ]);
 
-        $transaction = Transaction::find($transaction->id);
+        $toTransaction = Transaction::create([
+            'concept' => $request->concept,
+            'amount' => $request->amount,
+            'transaction_date' => $request->transaction_date,
+            'accounting_date' => $request->accounting_date,
+            'place' => $request->place ?? null,
+            'notes' => $request->notes ?? null,
+            'category_id' => 12,
+            'type_id' => 1,
+            'card_id' => $request->second_card_id,
+            'user_id' => $user->id
+        ]);
+
+        $relation = IncomeRelation::create([
+            'amount' => $request->amount,
+            'contact_id' => 3,
+            'from_id' => $fromTransaction->id,
+            'to_id' => $toTransaction->id,
+        ]);
+
+        $transaction = Transaction::find($fromTransaction->id);
 
         return response()->json([
             'message' => 'El movimiento fue almacenado correctamente.',
@@ -78,68 +124,115 @@ class TransactionController extends Controller
             'notes' => 'sometimes|max:128',
             'category_id' => 'required|numeric',
             'card_id' => 'required|numeric',
+            'second_card_id' => 'sometimes|numeric',
         ]);
 
-        $transaction = Transaction::findOrFail($id);
-
-        $isIncome = $transaction->type_id == 1;
+        $transaction = Transaction::with('card')->findOrFail($id);
         $absAmount = $validated['amount'];
 
-        // Validación de ingresos (type_id == 1)
-        if ($isIncome) {
-            $mainRt = IncomeRelation::where('from_id', $id)->first();
-            if ($mainRt) {
-                $expense = Transaction::find($mainRt->to_id);
-                $sumOtherRelations = IncomeRelation::where('to_id', $expense->id)
-                    ->where('from_id', '!=', $id)
-                    ->sum('amount');
-                $newTotal = $sumOtherRelations + $absAmount;
+        $isTransfer = $transaction->type_id === 3;
+        $isCreditIncome = $transaction->type_id === 1 && $transaction->card?->type_id === 2;
 
-                if ((-1 * $expense->amount) < $newTotal) {
+        $relation = null;
+        $relatedTransaction = null;
+
+        if ($isCreditIncome) {
+            $relation = IncomeRelation::where('to_id', $transaction->id)->first();
+        } elseif ($isTransfer) {
+            $relation = IncomeRelation::where('from_id', $transaction->id)->first();
+        }
+
+        if ($relation) {
+            $relatedTransaction = Transaction::findOrFail($isCreditIncome ? $relation->from_id : $relation->to_id);
+
+            // Validar si el ingreso no supera el gasto
+            if ($isCreditIncome) {
+                $sumOther = IncomeRelation::where('to_id', $transaction->id)
+                    ->where('from_id', '!=', $relation->from_id)
+                    ->sum('amount');
+                $newTotal = $sumOther + $absAmount;
+
+                if ((-1 * $relatedTransaction->amount) < $newTotal) {
                     return response()->json([
                         'message' => 'La actualización del importe provoca que la sumatoria de ingresos vinculados supere el importe del gasto.',
                     ], 409);
                 }
-
-                $mainRt->amount = $absAmount;
-                $mainRt->save();
             }
         }
 
-        // Validación de egresos (type_id != 1)
-        if (!$isIncome) {
-            $relations = IncomeRelation::where('to_id', $id)->get();
-            if ($relations->isNotEmpty()) {
-                $sumRt = $relations->sum('amount');
-                if ($absAmount < $sumRt) {
-                    return response()->json([
-                        'message' => 'La actualización del importe del gasto es menor a la sumatoria de sus ingresos vinculados.',
-                    ], 409);
-                }
+        // Actualiza la transacción principal
+        $transaction->fill([
+            'concept' => $validated['concept'],
+            'amount' => ($isCreditIncome || $transaction->type_id === 1) ? $absAmount : $absAmount * -1,
+            'transaction_date' => $validated['transaction_date'],
+            'accounting_date' => $validated['accounting_date'],
+            'place' => $validated['place'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'category_id' => $isCreditIncome ? 12 : ($isTransfer ? 10 : $validated['category_id']),
+            'card_id' => $validated['card_id'],
+        ]);
+        $transaction->save();
+
+        // Actualiza la transacción relacionada (si existe)
+        if ($relatedTransaction) {
+            $relatedTransaction->fill([
+                'concept' => $validated['concept'],
+                'transaction_date' => $validated['transaction_date'],
+                'accounting_date' => $validated['accounting_date'],
+                'place' => $validated['place'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            if ($isTransfer) {
+                $relatedTransaction->amount = $absAmount;
+                $relatedTransaction->card_id = $validated['second_card_id'] ?? $relatedTransaction->card_id;
             }
+
+            $relatedTransaction->save();
+
+            // Actualiza la relación
+            $relation->amount = $absAmount;
+            $relation->save();
+
+            return response()->json([
+                'message' => $isTransfer
+                    ? 'Transferencia actualizada correctamente.'
+                    : 'Ingreso relacionado actualizado correctamente.',
+                'data' => $transaction,
+            ], 200);
         }
-
-        // Actualiza los campos (excepto amount que depende del signo)
-        $transaction->fill(array_merge(
-            $validated,
-            ['amount' => $isIncome ? $absAmount : $absAmount * -1]
-        ));
-
-        $transaction->setRelation('user', null);
-        $transaction->card->setRelation('user', null);
 
         return response()->json([
             'message' => 'Recurso actualizado exitosamente.',
-            'data' => $transaction
+            'data' => $transaction,
         ], 200);
     }
+
 
     public function destroy(string $id)
     {
         $transaction = Transaction::findOrFail($id);
 
+        if ($transaction->type_id == 1 && $transaction->card->type_id == 2) {
+            $relation = IncomeRelation::where('to_id', $id)->first();
+            if ($relation) {
+                $relatedTransaction = Transaction::findOrFail($relation->from_id);
+                $relation->delete();
+                $relatedTransaction->delete();
+            }
+        }
+
+        if ($transaction->type_id == 3) {
+            $relation = IncomeRelation::where('from_id', $id)->first();
+            if ($relation) {
+                $relatedTransaction = Transaction::findOrFail($relation->to_id);
+                $relation->delete();
+                $relatedTransaction->delete();
+            }
+        }
+
         // Validaciones de ingresos
-        if ($transaction->type_id == 1) {
+        if ($transaction->type_id == 1 && $transaction->card->type_id != 2) {
             // Elimina la relación si existe
             IncomeRelation::where('from_id', $id)->delete();
         }

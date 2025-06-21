@@ -61,9 +61,12 @@ class CardController extends Controller
             'user_id' => $user->id,
         ]);
 
+        $cardData = Card::where('id', $card->id)
+            ->first();
+
         return response()->json([
             'message' => 'Recurso almacenado exitosamente.',
-            'data' => $card
+            'data' => $cardData
         ], 201);
     }
 
