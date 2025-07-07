@@ -289,15 +289,13 @@ class TransactionController extends Controller
 
     public function getMonthsWith(Request $request)
     {
-        $validated = $request->validate([
-            'year' => 'sometimes|numeric'
-        ]);
+        $year = $request->query('year'); // Solo tomamos year de la URL
 
         $user = $request->user();
 
         $dates = Transaction::without(['category', 'type', 'card', 'user'])
             ->where('user_id', $user->id)
-            ->when($validated['year'] ?? null, function ($query, $year) {
+            ->when($year, function ($query, $year) {
                 $query->whereYear('accounting_date', $year);
             })
             ->selectRaw('YEAR(accounting_date) as year, MONTH(accounting_date) as month')
@@ -308,10 +306,11 @@ class TransactionController extends Controller
 
         return response()->json([
             'message' => 'Consulta realizada exitosamente',
-            'year' => $request->year,
-            'data' => $dates
+            'year' => $year,
+            'data' => $dates,
         ], 200);
     }
+
 
     public function getCardsBalance($year, $month, Request $request)
     {
