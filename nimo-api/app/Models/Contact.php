@@ -16,15 +16,6 @@ class Contact extends Model
         'user_id'
     ];
 
-    protected $with = [
-        'type'
-    ];
-
-    public function type()
-    {
-        return $this->belongsTo(User::class);
-    }
-
     public function incomeRelations(): HasMany
     {
         return $this->hasMany(IncomeRelation::class);

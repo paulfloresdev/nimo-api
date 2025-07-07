@@ -20,9 +20,14 @@ class IncomeRelationController extends Controller
             'month' => 'sometimes|numeric|min:1|max:12',
             'year' => 'sometimes|numeric|min:1900',
             'page' => 'sometimes|numeric|min:1',
+            'exclude_payments' => 'sometimes|boolean',
         ]);
 
         $query = IncomeRelation::query();
+
+        if ($request->filled('exclude_payments')) {
+            $query->where('contact_id', '!=', 3);
+        }
 
         if ($request->filled('from_id')) {
             $query->where('from_id', $request->from_id);
@@ -39,11 +44,19 @@ class IncomeRelationController extends Controller
         if ($request->filled('month') && $request->filled('year')) {
             $query->whereHas('fromTransaction', function ($q) use ($request) {
                 $q->whereMonth('transaction_date', $request->month)
-                ->whereYear('transaction_date', $request->year);
+                    ->whereYear('transaction_date', $request->year);
             });
         }
 
-        $perPage = ($request->has('month') && $request->has('year')) ? 12 : 5;
+        $perPage = ($request->has('month') && $request->has('year')) ? 12 : 4;
+
+        // 👉 Calculamos total antes del paginate para evitar limitarlo
+        $totalAmount = (clone $query)
+            ->with('fromTransaction') // Necesario para acceder al modelo relacionado
+            ->get()
+            ->pluck('fromTransaction.amount')
+            ->filter()
+            ->sum();
 
         $incomeRelations = $query->with([
             'fromTransaction.category',
@@ -57,18 +70,13 @@ class IncomeRelationController extends Controller
             'contact',
         ])->paginate($perPage);
 
-        // ➕ Calcular suma de los fromTransaction.amount
-        $totalAmount = $incomeRelations->getCollection()
-            ->pluck('fromTransaction.amount')
-            ->filter()
-            ->sum();
-
         return response()->json([
             'message' => 'Datos obtenidos correctamente.',
             'data' => $incomeRelations,
             'total_amount' => $totalAmount,
         ], 200);
     }
+
 
 
 

@@ -339,6 +339,27 @@ class TransactionController extends Controller
             ->get()
             ->groupBy('card_id');
 
+        $creditBalances = [];
+        foreach ($creditCards as $card) {
+            $cardTransactions = $transactions[$card->id] ?? collect();
+
+            $periodTx = $cardTransactions->filter(function ($tx) use ($lastDayPrev, $lastDayCurr) {
+                return $tx->accounting_date <= $lastDayCurr;
+            });
+
+            $bills = $periodTx->where('type_id', 2)->sum('amount');
+            $payments = $periodTx->where('type_id', 1)->sum('amount');
+
+            $difference = $bills + $payments;
+
+            $creditBalances[] = [
+                'card' => $card,
+                'bills' => $bills,
+                'payments' => $payments,
+                'difference' => $difference
+            ];
+        }
+
         $debitBalances = [];
         foreach ($debitCards as $card) {
             $cardTransactions = $transactions[$card->id] ?? collect();
@@ -359,14 +380,7 @@ class TransactionController extends Controller
             $payments = $periodTx->where('type_id', 3)->sum('amount');
 
             $debitBalances[] = [
-                'card' => [
-                    'id' => $card->id,
-                    'numbers' => $card->numbers,
-                    'color' => $card->color,
-                    'bank_name' => $card->bank->name,
-                    'bank_img_path' => $card->bank->img_path,
-                    'network_img_path' => $card->network->img_path,
-                ],
+                'card' => $card,
                 'initial_balance' => $initialBalance,
                 'final_balance' => $finalBalance,
                 'difference' => $difference,
@@ -376,42 +390,12 @@ class TransactionController extends Controller
             ];
         }
 
-        $creditBalances = [];
-        foreach ($creditCards as $card) {
-            $cardTransactions = $transactions[$card->id] ?? collect();
-
-            $periodTx = $cardTransactions->filter(function ($tx) use ($lastDayPrev, $lastDayCurr) {
-                return $tx->accounting_date > $lastDayPrev && $tx->accounting_date <= $lastDayCurr;
-            });
-
-            $bills = $periodTx->where('type_id', 2)->sum('amount');
-            $payments = $periodTx->where('type_id', 1)->sum('amount');
-
-            $difference = $bills + $payments;
-
-            $creditBalances[] = [
-                'card' => [
-                    'id' => $card->id,
-                    'numbers' => $card->numbers,
-                    'color' => $card->color,
-                    'bank_name' => $card->bank->name,
-                    'bank_img_path' => $card->bank->img_path,
-                    'network_img_path' => $card->network->img_path,
-                ],
-                'bills' => $bills,
-                'payments' => $payments,
-                'difference' => $difference
-            ];
-        }
-
         return response()->json([
             'message' => 'Balance del mes obtenido exitosamente',
             'data' => [
-                'cards' => [
-                    'debit' => $debitBalances,
-                    'credit' => $creditBalances
-                ]
-            ]
+                'debit' => $debitBalances,
+                'credit' => $creditBalances
+            ],
         ]);
     }
 
@@ -423,7 +407,22 @@ class TransactionController extends Controller
         $lastDayPrev = Carbon::createFromDate($year, $month, 1)->subDay()->endOfDay();
         $lastDayCurr = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
 
-        $bills = Transaction::where('user_id', $user->id)
+        $transactions = Transaction::where('user_id', $user->id)
+            ->where('accounting_date', '<=', $lastDayCurr)
+            ->get();
+
+        // Saldo inicial de debito
+        $initialBalance = Transaction::where('user_id', $user->id)
+            ->where('accounting_date', '<=', $lastDayPrev)
+            ->whereIn('card_id', function ($query) {
+                $query->select('id')
+                    ->from('cards')
+                    ->where('type_id', 1);
+            })
+            ->sum('amount');
+
+        // Credito
+        $currentBills = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '>', $lastDayPrev)
             ->where('accounting_date', '<=', $lastDayCurr)
             ->where('type_id', 2)
@@ -434,7 +433,7 @@ class TransactionController extends Controller
             })
             ->sum('amount');
 
-        $payments = Transaction::where('user_id', $user->id)
+        $currentPayments = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '>', $lastDayPrev)
             ->where('accounting_date', '<=', $lastDayCurr)
             ->where('type_id', 1)
@@ -445,14 +444,6 @@ class TransactionController extends Controller
             })
             ->sum('amount');
 
-        $initialBalance = Transaction::where('user_id', $user->id)
-            ->where('accounting_date', '<=', $lastDayPrev)
-            ->whereIn('card_id', function ($query) {
-                $query->select('id')
-                    ->from('cards')
-                    ->where('type_id', 1);
-            })
-            ->sum('amount');
         $incomes = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '>', $lastDayPrev)
             ->where('accounting_date', '<=', $lastDayCurr)
@@ -463,7 +454,7 @@ class TransactionController extends Controller
                     ->where('type_id', 1);
             })
             ->sum('amount');
-        $expenses = $bills + Transaction::where('user_id', $user->id)
+        $expenses = Transaction::where('user_id', $user->id)
             ->where('accounting_date', '>', $lastDayPrev)
             ->where('accounting_date', '<=', $lastDayCurr)
             ->where('type_id', 2)
@@ -474,22 +465,46 @@ class TransactionController extends Controller
             })
             ->sum('amount');
 
-        $finalBalance = $initialBalance + $incomes + $expenses;
+        $initialBills = Transaction::where('user_id', $user->id)
+            ->where('accounting_date', '<=', $lastDayPrev)
+            ->where('type_id', '!=', 3)
+            ->whereIn('card_id', function ($query) {
+                $query->select('id')
+                    ->from('cards')
+                    ->where('type_id', 2);
+            })
+            ->sum('amount');
+
+        $finalBills = Transaction::where('user_id', $user->id)
+            ->where('accounting_date', '<=', $lastDayCurr)
+            ->where('type_id', '!=', 3)
+            ->whereIn('card_id', function ($query) {
+                $query->select('id')
+                    ->from('cards')
+                    ->where('type_id', 2);
+            })
+            ->sum('amount');
+
+        $finalBalance = $initialBalance + $incomes + $expenses + ($currentPayments * -1);
+        $projectedFinalBalance = $initialBalance + $incomes + $expenses + $currentBills + $initialBills;
 
         return response()->json([
             'message' => 'Balance del mes obtenido exitosamente',
             'data' => [
                 'credit' => [
-                    'expenses' => $bills,
-                    'payments' => $payments,
-                    'difference' => $bills + $payments
+                    'expenses' => $currentBills,
+                    'payments' => $currentPayments,
+                    'initial_bills' => $initialBills,
+                    'final_bills' => $finalBills,
                 ],
                 'debit' => [
                     'initial_balance' => $initialBalance,
                     'incomes' => $incomes,
                     'expenses' => $expenses,
                     'final_balance' => $finalBalance,
-                    'difference' => $finalBalance - $initialBalance
+                    'projected_final_balance' => $projectedFinalBalance,
+                    'difference' => $finalBalance - $initialBalance,
+                    'projected_difference' => $projectedFinalBalance - $initialBalance
                 ]
             ]
         ]);
