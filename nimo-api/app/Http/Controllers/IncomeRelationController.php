@@ -50,9 +50,12 @@ class IncomeRelationController extends Controller
 
         $perPage = ($request->has('month') && $request->has('year')) ? 12 : 4;
 
-        // 👉 Calculamos total antes del paginate para evitar limitarlo
+        // 💡 Forzamos la página desde el cuerpo del request
+        $currentPage = $request->input('page', 1);
+
+        // 🔁 Calculamos el total antes de paginar
         $totalAmount = (clone $query)
-            ->with('fromTransaction') // Necesario para acceder al modelo relacionado
+            ->with('fromTransaction')
             ->get()
             ->pluck('fromTransaction.amount')
             ->filter()
@@ -68,7 +71,7 @@ class IncomeRelationController extends Controller
             'toTransaction.card.type',
             'toTransaction.card.network',
             'contact',
-        ])->paginate($perPage);
+        ])->paginate($perPage, ['*'], 'page', $currentPage);
 
         return response()->json([
             'message' => 'Datos obtenidos correctamente.',
@@ -76,6 +79,7 @@ class IncomeRelationController extends Controller
             'total_amount' => $totalAmount,
         ], 200);
     }
+
 
 
 
