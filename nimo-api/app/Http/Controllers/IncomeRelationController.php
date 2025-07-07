@@ -11,7 +11,7 @@ class IncomeRelationController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function getAllFiltered(Request $request)
     {
         $validated = $request->validate([
             'from_id' => 'sometimes|numeric',

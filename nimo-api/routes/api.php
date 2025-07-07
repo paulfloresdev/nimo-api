@@ -61,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // INCOME RELATIONS
     Route::apiResource('income-relations', IncomeRelationController::class);
     Route::post('/verify-income-relation', [IncomeRelationController::class, 'verifyIncomeRelation']);
-    Route::post('/income-relations/all', [IncomeRelationController::class, 'index']);
+    Route::post('/income-relations/all', [IncomeRelationController::class, 'getAllFiltered']);
 
     // RECURRINGS
     Route::apiResource('recurrings', RecurringController::class);
