@@ -28,6 +28,9 @@ return [
 
     'env' => env('APP_ENV', 'production'),
 
+    'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+
+
     /*
     |--------------------------------------------------------------------------
     | Application Debug Mode

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\IncomeRelation;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
+use App\Exports\IncomeRelationsExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class IncomeRelationController extends Controller
 {
@@ -78,6 +80,39 @@ class IncomeRelationController extends Controller
             'data' => $incomeRelations,
             'total_amount' => $totalAmount,
         ], 200);
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'required|numeric|min:1|max:12',
+            'year' => 'required|numeric|min:1900',
+            'contact_id' => 'required|numeric',
+        ]);
+
+        $query = IncomeRelation::query();
+
+        // Filtro por contact_id
+        $query->where('contact_id', $request->contact_id);
+
+        // Filtro por mes y año de la transacción
+        $query->whereHas('fromTransaction', function ($q) use ($request) {
+            $q->whereMonth('transaction_date', $request->month)
+                ->whereYear('transaction_date', $request->year);
+        });
+
+        // Cargar relaciones necesarias
+        $data = $query->with([
+            'fromTransaction.category',
+            'fromTransaction.card.bank',
+            'fromTransaction.card.type',
+            'toTransaction.category',
+            'toTransaction.card.bank',
+            'toTransaction.card.type',
+            'contact',
+        ])->get();
+
+        return Excel::download(new IncomeRelationsExport($data), 'income-relations.xlsx');
     }
 
 
