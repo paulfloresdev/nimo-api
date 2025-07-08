@@ -45,7 +45,7 @@ class IncomeRelationsExport implements FromCollection, WithHeadings, WithMapping
         return [
             $relation->contact->alias,
             $relation->fromTransaction->concept,
-            $relation->amount,
+            $relation->toTransaction->amount,
             $relation->toTransaction && $relation->toTransaction->transaction_date
                 ? Date::stringToExcel($relation->toTransaction->transaction_date)
                 : null,
