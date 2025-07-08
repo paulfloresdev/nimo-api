@@ -114,7 +114,7 @@ class IncomeRelationController extends Controller
 
         $contact = $data->first()->contact ?? null;
 
-        return Excel::download(new IncomeRelationsExport($data), 'Cuentas ' . $contact . ' ' . $request->year . '-' .  $request->month . '.xlsx');
+        return Excel::download(new IncomeRelationsExport($data), 'Cuentas ' . $contact->alias . ' ' . $request->year . '-' .  $request->month . '.xlsx');
     }
 
 
