@@ -32,7 +32,7 @@ class ContactController extends Controller
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
-    {   
+    {
         $user = $request->user();
 
         $validated = $request->validate([
@@ -110,6 +110,12 @@ class ContactController extends Controller
             return response()->json([
                 'message' => 'No se encontró el recurso que busca eliminar.',
             ], 404);
+        }
+
+        if ($contact->incomeRelations()->count() > 0) {
+            return response()->json([
+                'message' => 'No se puede eliminar el contacto porque tiene relaciones de ingresos asociadas.',
+            ], 400);
         }
 
         $contact->delete();
