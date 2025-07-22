@@ -342,22 +342,33 @@ class TransactionController extends Controller
         foreach ($creditCards as $card) {
             $cardTransactions = $transactions[$card->id] ?? collect();
 
-            $periodTx = $cardTransactions->filter(function ($tx) use ($lastDayPrev, $lastDayCurr) {
-                return $tx->accounting_date <= $lastDayCurr;
-            });
+            // Transacciones hasta fin de mes anterior (balance inicial)
+            $prevTx = $cardTransactions->filter(fn($tx) => $tx->accounting_date <= $lastDayPrev);
+            $prevBills = $prevTx->where('type_id', 2)->sum('amount');     // negativos
+            $prevPayments = $prevTx->where('type_id', 1)->sum('amount');  // positivos
+            $initialBalance = $prevBills + $prevPayments;
 
-            $bills = $periodTx->where('type_id', 2)->sum('amount');
-            $payments = $periodTx->where('type_id', 1)->sum('amount');
+            // Transacciones del mes actual
+            $periodTx = $cardTransactions->filter(
+                fn($tx) =>
+                $tx->accounting_date > $lastDayPrev && $tx->accounting_date <= $lastDayCurr
+            );
 
-            $difference = $bills + $payments;
+            $currentBills = $periodTx->where('type_id', 2)->sum('amount');     // negativos
+            $currentPayments = $periodTx->where('type_id', 1)->sum('amount');  // positivos
+
+            $finalBalance = $initialBalance + $currentBills + $currentPayments;
 
             $creditBalances[] = [
                 'card' => $card,
-                'bills' => $bills,
-                'payments' => $payments,
-                'difference' => $difference
+                'initial_balance' => round($initialBalance, 2),
+                'bills' => round($currentBills, 2),
+                'payments' => round($currentPayments, 2),
+                'final_balance' => round($finalBalance, 2)
             ];
         }
+
+
 
         $debitBalances = [];
         foreach ($debitCards as $card) {
