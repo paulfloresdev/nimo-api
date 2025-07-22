@@ -137,6 +137,13 @@ class CardController extends Controller
             ], 404);
         }
 
+        $hasTransactions = $card->transactions()->exists();
+        if ($hasTransactions) {
+            return response()->json([
+                'message' => 'No se puede eliminar la tarjeta porque tiene transacciones asociadas.',
+            ], 400);
+        }
+
         $card->delete();
 
         return response()->json([
