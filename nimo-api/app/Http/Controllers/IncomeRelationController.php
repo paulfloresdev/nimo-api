@@ -7,6 +7,8 @@ use App\Models\Transaction;
 use Illuminate\Http\Request;
 use App\Exports\IncomeRelationsExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class IncomeRelationController extends Controller
 {
@@ -82,7 +84,7 @@ class IncomeRelationController extends Controller
         ], 200);
     }
 
-    public function exportExcel(Request $request)
+    public function exportExcel(Request $request): StreamedResponse|Response
     {
         $validated = $request->validate([
             'month' => 'required|numeric|min:1|max:12',
@@ -92,16 +94,13 @@ class IncomeRelationController extends Controller
 
         $query = IncomeRelation::query();
 
-        // Filtro por contact_id
         $query->where('contact_id', $request->contact_id);
 
-        // Filtro por mes y año de la transacción
         $query->whereHas('fromTransaction', function ($q) use ($request) {
             $q->whereMonth('transaction_date', $request->month)
                 ->whereYear('transaction_date', $request->year);
         });
 
-        // Cargar relaciones necesarias
         $data = $query->with([
             'fromTransaction.category',
             'fromTransaction.card.bank',
@@ -110,12 +109,27 @@ class IncomeRelationController extends Controller
             'toTransaction.card.bank',
             'toTransaction.card.type',
             'contact',
-        ])->get();
+        ])->get()
+            ->sortBy(function ($item) {
+                return optional($item->toTransaction)->transaction_date;
+            })
+            ->values();
 
-        $contact = $data->first()->contact ?? null;
+        if ($data->isEmpty()) {
+            // Retornar HTML simple con mensaje si se accede desde navegador
+            return response(
+                "<h2 style='font-family:sans-serif;color:#444;margin:2rem'>No se encontraron datos para exportar.</h2>",
+                200,
+                ['Content-Type' => 'text/html']
+            );
+        }
 
-        return Excel::download(new IncomeRelationsExport($data), 'Cuentas ' . $contact->alias . ' ' . $request->year . '-' .  $request->month . '.xlsx');
+        $contact = $data->first()->contact;
+        $fileName = 'Cuentas_' . ($contact->alias ?? 'Desconocido') . "_{$request->year}-{$request->month}.xlsx";
+
+        return Excel::download(new IncomeRelationsExport($data, $contact->alias, $request->month, $request->year), $fileName);
     }
+
 
 
 
