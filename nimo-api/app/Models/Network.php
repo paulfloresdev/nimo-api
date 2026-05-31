@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Network extends Model
 {
-    protected $fillable = ['name', 'img_path'];
+    protected $fillable = ['name', 'img_path', 'img_path_b'];
 
     protected $hidden = ['created_at', 'updated_at'];
 

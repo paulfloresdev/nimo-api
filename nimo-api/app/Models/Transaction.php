@@ -68,4 +68,9 @@ class Transaction extends Model
         return $this->hasOne(RecurringRecord::class);
     }
 
+    public function monthlySubBudgetLinks()
+    {
+        return $this->hasMany(MonthlySubBudgetTransaction::class);
+    }
+
 }

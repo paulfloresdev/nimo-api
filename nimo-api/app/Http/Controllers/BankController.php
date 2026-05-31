@@ -144,6 +144,12 @@ class BankController extends Controller
 
     public function destroy(Bank $bank)
     {
+        if ($bank->cards()->exists()) {
+            return response()->json([
+                'message' => 'No se puede eliminar el banco porque tiene tarjetas asociadas.',
+            ], 409);
+        }
+
         if ($bank->img_path) {
             $imagePath = str_replace('/storage', 'public', $bank->img_path);
             Storage::delete($imagePath);

@@ -16,7 +16,40 @@ class RecurringController extends Controller
     {
         $user = $request->user();
 
-        $recurrings = Recurring::where('user_id', $user->id)->paginate(20);
+        $validated = $request->validate([
+            'concept' => 'sometimes|string|max:64',
+            'category_id' => 'sometimes|integer',
+            'type_id' => 'sometimes|integer',
+            'card_id' => 'sometimes|integer',
+            'include_inactive' => 'sometimes|in:true,false,1,0',
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+
+        $includeInactive = filter_var(
+            $validated['include_inactive'] ?? false,
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        $query = Recurring::where('user_id', $user->id)
+            ->when(!$includeInactive, function ($query) {
+                $query->where('active', true);
+            })
+            ->when($validated['concept'] ?? null, function ($query, $concept) {
+                $query->where('concept', 'LIKE', '%' . trim($concept) . '%');
+            })
+            ->when($validated['category_id'] ?? null, function ($query, $categoryId) {
+                $query->where('category_id', $categoryId);
+            })
+            ->when($validated['type_id'] ?? null, function ($query, $typeId) {
+                $query->where('type_id', $typeId);
+            })
+            ->when($validated['card_id'] ?? null, function ($query, $cardId) {
+                $query->where('card_id', $cardId);
+            })
+            ->orderByDesc('created_at');
+
+        $recurrings = $query->paginate($validated['per_page'] ?? 20);
 
         if ($recurrings->isEmpty()) {
             return response()->json([
@@ -41,7 +74,9 @@ class RecurringController extends Controller
             'concept' => 'required|string|max:64',
             'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],     
             'category_id' => 'required|numeric',
-            'type_id' => 'required|numeric'
+            'type_id' => 'required|numeric',
+            'card_id' => 'required|numeric|exists:cards,id',
+            'active' => 'sometimes|boolean'
         ]);
 
         $recurring = Recurring::create([
@@ -49,10 +84,12 @@ class RecurringController extends Controller
             'amount' => ($request->type_id == 1) ? $request->amount : $request->amount * (-1),
             'category_id' => $request->category_id,
             'type_id' => $request->type_id,
+            'card_id' => $request->card_id,
+            'active' => $request->boolean('active', true),
             'user_id' => $user->id
         ]);
 
-        $recurring->with(['category', 'type']);
+        $recurring = Recurring::find($recurring->id);
 
         return response()->json([
             'message' => 'Recurso almacenado exitosamente.',
@@ -90,12 +127,16 @@ class RecurringController extends Controller
             'concept' => 'required|string|max:64',
             'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,2})?$/'],
             'category_id' => 'required|numeric',
-            'type_id' => 'required|numeric'
+            'type_id' => 'required|numeric',
+            'card_id' => 'required|numeric|exists:cards,id',
+            'active' => 'sometimes|boolean',
+            'update_generated_transactions' => 'sometimes|boolean',
         ]);
 
-        $recurring = Recurring::findOrFail($id);
+        $recurring = Recurring::where('user_id', $user->id)->findOrFail($id);
 
         $adjustedAmount = ($request->type_id == 1) ? $request->amount : $request->amount * (-1);
+        $updateGeneratedTransactions = $request->boolean('update_generated_transactions', false);
 
         // Actualizar el recurring
         $recurring->update([
@@ -103,22 +144,29 @@ class RecurringController extends Controller
             'amount' => $adjustedAmount,
             'category_id' => $request->category_id,
             'type_id' => $request->type_id,
+            'card_id' => $request->card_id,
+            'active' => $request->boolean('active', $recurring->active),
             'user_id' => $user->id
         ]);
 
-        // Buscar los records relacionados
-        $records = RecurringRecord::where('recurring_id', $id)->get();
+        if ($updateGeneratedTransactions) {
+            // Buscar los records relacionados
+            $records = RecurringRecord::where('recurring_id', $id)->get();
 
-        // Obtener los IDs de las transacciones
-        $transactionIds = $records->pluck('transaction_id');
+            // Obtener los IDs de las transacciones
+            $transactionIds = $records->pluck('transaction_id');
 
-        // Actualizar todas las transacciones relacionadas
-        Transaction::whereIn('id', $transactionIds)->update([
-            'concept' => $request->concept,
-            'amount' => $adjustedAmount,
-            'category_id' => $request->category_id,
-            'type_id' => $request->type_id
-        ]);
+            // Actualizar todas las transacciones relacionadas
+            Transaction::where('user_id', $user->id)
+                ->whereIn('id', $transactionIds)
+                ->update([
+                    'concept' => $request->concept,
+                    'amount' => $adjustedAmount,
+                    'category_id' => $request->category_id,
+                    'type_id' => $request->type_id,
+                    'card_id' => $request->card_id
+                ]);
+        }
 
         return response()->json([
             'message' => 'Recurso actualizado exitosamente.',

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Category;
+use App\Models\MonthlySubBudget;
+use App\Models\Recurring;
+use App\Models\Transaction;
 
 class CategoryController extends Controller
 {
@@ -12,7 +15,11 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        $categories = Category::all();
+        $categories = Category::orderByRaw("
+            FIELD(id,
+                1,15,16,13,14,2,4,17,6,11,5,7,18,8,10,9,3,12
+            )
+        ")->get();
 
         if ($categories->isEmpty()) {
             return response()->json([
@@ -32,8 +39,8 @@ class CategoryController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|max:24',
-            'icon' => 'required|max:24',
+            'name' => 'required|max:32',
+            'icon' => 'required|max:32',
         ]);
 
         $category = Category::create([
@@ -72,8 +79,8 @@ class CategoryController extends Controller
     public function update(Request $request, string $id)
     {
         $validated = $request->validate([
-            'name' => 'required|max:24',
-            'icon' => 'required|max:24',
+            'name' => 'required|max:32',
+            'icon' => 'required|max:32',
         ]);
 
         $category = Category::findOrFail($id);
@@ -106,6 +113,16 @@ class CategoryController extends Controller
             return response()->json([
                 'message' => 'No se encontró el recurso que busca eliminar.',
             ], 404);
+        }
+
+        if (
+            Transaction::where('category_id', $category->id)->exists() ||
+            Recurring::where('category_id', $category->id)->exists() ||
+            MonthlySubBudget::where('category_id', $category->id)->exists()
+        ) {
+            return response()->json([
+                'message' => 'No se puede eliminar la categoria porque esta en uso.',
+            ], 409);
         }
 
         $category->delete();

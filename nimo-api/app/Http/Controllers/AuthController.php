@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -29,6 +29,10 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+        Role::findOrCreate('Customer', 'web');
+        $user->assignRole('Customer');
+        $user->load('roles');
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -43,10 +47,17 @@ class AuthController extends Controller
     //  INICIAR SESIÓN
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        $request->validate(
+            [
+                'email' => 'required|email',
+                'password' => 'required',
+            ],
+            [
+                'email.required' => 'El correo electrónico es obligatorio.',
+                'email.email' => 'El correo electrónico no tiene un formato válido.',
+                'password.required' => 'La contraseña es obligatoria.',
+            ]
+        );
 
         $user = User::where('email', $request->email)->first();
 
@@ -56,7 +67,14 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if (!$user->active) {
+            return response()->json([
+                'message' => 'Tu usuario esta desactivado.',
+            ], 403);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
+        $user->load('roles');
 
         return response()->json([
             'message' => 'Usuario logueado exitosamente.',
@@ -77,7 +95,15 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
         ]);
 
-        $user = User::with('role')->find($id);
+        $authUser = $request->user();
+
+        if ($authUser->id !== (int) $id && !$authUser->hasRole('Admin')) {
+            return response()->json([
+                'message' => 'No tienes permisos para actualizar este usuario.'
+            ], 403);
+        }
+
+        $user = User::find($id);
 
         if ($user == null) {
             return response()->json([
@@ -90,6 +116,7 @@ class AuthController extends Controller
         $user->phone = $request->phone;
         $user->email = $request->email;
         $user->save();
+        $user->load('roles');
 
         return response()->json([
             'message' => 'Datos de usuario actualizados correctamente.',
@@ -104,6 +131,14 @@ class AuthController extends Controller
             'password' => 'required|string|min:8'
         ]);
 
+        $authUser = $request->user();
+
+        if ($authUser->id !== (int) $id && !$authUser->hasRole('Admin')) {
+            return response()->json([
+                'message' => 'No tienes permisos para actualizar este usuario.'
+            ], 403);
+        }
+
         $user = User::find($id);
 
         if ($user == null) {
@@ -114,6 +149,7 @@ class AuthController extends Controller
 
         $user->password = Hash::make($request->password);
         $user->save();
+        $user->load('roles');
 
         return response()->json([
             'message' => 'Contraseña de usuario actualizada correctamente.',
@@ -132,6 +168,9 @@ class AuthController extends Controller
     //  OBTENER USUARIO AUTENTICADO
     public function me(Request $request)
     {
-        return response()->json($request->user(), 200);
+        return response()->json([
+            'message' => 'Consulta realizada exitosamente.',
+            'data' => $request->user()->load('roles')
+        ], 200);
     }
 }
