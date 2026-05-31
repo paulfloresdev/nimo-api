@@ -11,18 +11,26 @@ class Recurring extends Model
         'amount', 
         'category_id', 
         'type_id', 
+        'card_id',
+        'active',
         'user_id'
     ];
 
     protected $hidden = [
         'category_id',
         'type_id',
+        'card_id',
         'user_id'
     ];
 
     protected $with = [
         'category',
-        'type'
+        'type',
+        'card'
+    ];
+
+    protected $casts = [
+        'active' => 'boolean',
     ];
 
     public function category()
@@ -33,6 +41,11 @@ class Recurring extends Model
     public function type()
     {
         return $this->belongsTo(TransactionType::class);
+    }
+
+    public function card()
+    {
+        return $this->belongsTo(Card::class);
     }
 
     public function user()

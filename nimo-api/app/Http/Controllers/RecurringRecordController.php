@@ -11,16 +11,23 @@ class RecurringRecordController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+public function index(Request $request)
 {
     $validated = $request->validate([
         'recurring_id' => 'required|integer|exists:recurrings,id'
     ]);
 
-    $transactions = Transaction::whereHas('recurringRecord', function ($query) use ($request) {
-        $query->where('recurring_id', $request->recurring_id);
+    $user = $request->user();
+
+    $transactions = Transaction::where('user_id', $user->id)
+    ->whereHas('recurringRecord', function ($query) use ($request) {
+        $query->where('recurring_id', $request->recurring_id)
+            ->whereHas('recurring', function ($recurringQuery) use ($request) {
+                $recurringQuery->where('user_id', $request->user()->id);
+            });
     })
     ->with(['category:id,name,icon', 'type:id,type', 'card:id,numbers,color,type_id,bank_id,network_id', 'card.bank:id,name,img_path', 'card.network:id,name,img_path', 'card.type:id,type'])
+    ->orderBy('transaction_date')
     ->get([
         'id', 'concept', 'amount', 'transaction_date', 'accounting_date', 'category_id', 'type_id', 'card_id'
     ]);
@@ -51,7 +58,10 @@ class RecurringRecordController extends Controller
                 'id' => $t->card->id,
                 'numbers' => $t->card->numbers,
                 'color' => $t->card->color,
-                'type' => $t->card->type->type,
+                'type' => [
+                    'id' => $t->card->type->id,
+                    'type' => $t->card->type->type,
+                ],
                 'bank' => [
                     'id' => $t->card->bank->id,
                     'name' => $t->card->bank->name,

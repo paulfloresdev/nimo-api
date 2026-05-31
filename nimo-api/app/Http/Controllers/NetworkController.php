@@ -30,14 +30,22 @@ class NetworkController extends Controller
         $request->validate([
             'name' => 'required|string|max:64',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image_b' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $imagePath = $request->file('image')->store('networks', 'public');
         $imageUrl = Storage::url($imagePath);
+        $imageUrlB = null;
+
+        if ($request->hasFile('image_b')) {
+            $imagePathB = $request->file('image_b')->store('networks', 'public');
+            $imageUrlB = Storage::url($imagePathB);
+        }
 
         $network = Network::create([
             'name' => $request->name,
             'img_path' => $imageUrl,
+            'img_path_b' => $imageUrlB,
         ]);
 
         return response()->json([
@@ -67,6 +75,7 @@ class NetworkController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:64',
             'image' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image_b' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $network = Network::findOrFail($id);
@@ -78,6 +87,13 @@ class NetworkController extends Controller
             // Guardar nueva imagen
             $path = $request->file('image')->store('networks', 'public');
             $network->img_path = Storage::url($path);
+        }
+
+        if ($request->hasFile('image_b')) {
+            $this->deleteImageFile($network->img_path_b);
+
+            $path = $request->file('image_b')->store('networks', 'public');
+            $network->img_path_b = Storage::url($path);
         }
 
         if ($request->has('name')) {
@@ -125,10 +141,14 @@ class NetworkController extends Controller
 
     public function destroy(Network $network)
     {
-        if ($network->img_path) {
-            $imagePath = str_replace('/storage', 'public', $network->img_path);
-            Storage::delete($imagePath);
+        if ($network->cards()->exists()) {
+            return response()->json([
+                'message' => 'No se puede eliminar la red porque tiene tarjetas asociadas.',
+            ], 409);
         }
+
+        $this->deleteImageFile($network->img_path);
+        $this->deleteImageFile($network->img_path_b);
 
         $network->delete();
 
